@@ -1,0 +1,54 @@
+import datetime
+# import psutil
+# import requests
+
+
+#from datetime import date
+import psutil
+import requests
+import serial
+
+
+
+
+
+ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+ser.reset_input_buffer()
+motion = 0
+light = 0
+temperature = 0
+while True:
+    if ser.in_waiting > 0:
+        line = ser.readline().decode('utf-8').rstrip()
+        #print(line.split())
+        for l in line.split():
+            if l[0] == 'l':
+                light = l[1:]
+            if l[0] == 'm':
+                motion = l[1:]
+            if l[0] == 't':
+                temperature = l[1:]
+        
+                temperature = 960 - int(temperature)
+                light = round(int(light) / 29)
+                motion = int(motion)*10
+                
+                data = { "date": str(datetime.datetime.now()), "movement": motion, "temperature": temperature, "brightness": light }
+                print(data)
+                r = requests.post("https://hook.integromat.com/g1q4jupqs219uekvkcgrdf30j652ss28", json=data)
+print(r.status_code)
+
+
+# 
+# data = {"date": str(datetime.datetime.now()), "movement": psutil.disk_usage("/").percent, "temperature": psutil.cpu_percent(1),
+#         "brightness": psutil.cpu_percent(1)}
+# 
+# print("data", data)
+
+# email = dochia21@student.oulu.fi
+# Password = Unioulu2021.
+# https://hook.integromat.com/g1q4jupqs219uekvkcgrdf30j652ss28
+
+#while data:
+    
+

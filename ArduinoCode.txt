@@ -1,0 +1,77 @@
+const int LDR = A0;
+int input_val = 0;
+#define RT0 10000   // Ω
+#define B 3977      // K
+#define VCC 5    //Supply voltage
+#define R 10000  //R=10KΩ
+//Variables
+int RT, VR, ln, light, motion, temp, ref;
+char flag, t, l, m;
+
+void setup()
+{
+  pinMode(11, OUTPUT);    // sets the digital pin 13 as output
+  pinMode (2,INPUT); // The PIR Sensor
+  pinMode (12,OUTPUT); // The LED for PIR
+  digitalWrite(11, LOW);  // sets the digital pin 13 off
+  Serial.begin(9600);
+  pinMode(3, OUTPUT);    // sets the digital pin 3 as output
+}
+
+void loop(){
+  
+  
+  temp = get_temperature();
+
+  light = get_light();
+  motion = get_motion();  
+  serial_write();
+  Serial.print("\n----------------------------------\n");
+  delay(2000);
+}
+
+
+
+void serial_write(){
+  Serial.println("Hello from Arduino!");
+  Serial.print('t');
+  Serial.println(temp);
+  Serial.print('l');
+  Serial.println(light);
+  Serial.print('m');
+  Serial.println(motion);
+  }
+
+
+/*/////////////////////////////////////////*/
+  int get_motion(){
+    int val=digitalRead(2);
+    if (val==1){ //When object passed
+      Serial.print("MOVEMENT\n");
+      return 1;
+    }
+    else{
+      Serial.print("NOT MOVEMENT\n");
+      return 0;
+    }
+  }
+  
+  
+  /*/////////////////////////////////////////*/
+  int get_light(){
+    input_val = analogRead(LDR);
+    Serial.print("LDR Value is: ");
+    Serial.println(input_val);
+    return input_val;
+  }
+
+
+
+/*/////////////////////////////////////////*/
+ int get_temperature(){
+    ref = analogRead(A1);
+    Serial.print("Temperature: ");
+    Serial.print(ref);
+    Serial.print('\n');
+    return ref;
+  }
