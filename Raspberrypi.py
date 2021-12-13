@@ -1,47 +1,106 @@
-import timeimport RPi.GPIO as GPIO
+
+import datetime
+from gspread.utils import ValueRenderOption
+import psutil
+import requests
+import serial
 import time
+import RPi.GPIO as GPIO
 
-PIR = 3
-NTC = 5
-LDR = 7
+import gspread
+from oauth2client import client
+from oauth2client.service_account import ServiceAccountCredentials
+from pprint import pprint
 
+# Connect to Google Sheets document 'IoT Data'
+scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/spreadsheets',"https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
+sheet = client.open("IoT Data").sheet1
+
+# Read incoming Arduino data from Serial port
+ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+ser.reset_input_buffer()
+motion = 0
+light = 0
+temperature = 0
+i = 0
+GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BOARD)		#choose pin no. system
-GPIO.setup(PIR, GPIO.IN)	
-GPIO.setup(NTC, GPIO.IN)
-GPIO.setup(LDR, GPIO.IN)
+GPIO.setup(18,GPIO.OUT)
+GPIO.setup(23,GPIO.OUT)
 
-#FLAGS
 
-lights = False
-hot = False
-
-m = 3
 while True:
-#when motion detected turn on LED
-    #if(GPIO.input(PIR)):
-    #    print("MOVEMENT")
-        #print("Motion detected" + str(i))
-        
-    ### LIGHT DETECTION ##
-    if(GPIO.input(7) and not lights):
-        print("LIGHTS ON")
-        lights = True
-    if(not GPIO.input(LDR) and lights):
-        print("LIGHTS OFF")
-        lights = False
     
-    
-    if(GPIO.input(NTC) and not hot):
-        print("TOO HOT")
-        hot = True
-    if(not GPIO.input(NTC) and hot):
-        print("NORMAL TEMPERATURE")
-        hot = False
+    if ser.in_waiting > 0:
+        line = ser.readline().decode('utf-8').rstrip()
+        #print(line.split())
+        for l in line.split():
+            if l[0] == 'l':
+                light = l[1:]
+            if l[0] == 'm':
+                motion = l[1:]
+            if l[0] == 't':
+                temperature = l[1:]
         
-        
-    if(GPIO.input(PIR)):
-        print("MOVEMENT")
-        time.sleep(1)   #Pause time in seconds
-        
-        
+                temperature = 960 - int(temperature)
+                light = round(int(light) / 29)
+                motion = int(motion)*10
+                
+                data = { 
+                    "date": str(datetime.datetime.now()), 
+                    "movement": motion, 
+                    "temperature": temperature, 
+                    "brightness": light 
+                }
+                print(data)
+
+                # Method 1: Send data to Google Sheets with Integromat
+                # r = requests.post("https://hook.integromat.com/g1q4jupqs219uekvkcgrdf30j652ss28", json=data)
+                # print(r.status_code)
+
+                # Method 2: Send data to Google Sheets with Google Sheets API
+                new_row = [data.get("date"), data.get("movement"), data.get("temperature"), data.get("brightness")]
+                sheet.insert_row(new_row, 2, value_input_option="USER_ENTERED")
+                
+                #sheet.append_row(new_row, value_input_option="USER_ENTERED")
+                
+                
+                
+                
+                
+                
+                temp_cell = sheet.get_values("E1")[0][0]
+                light_cell = sheet.get_values("G1")[0][0]
+                if temp_cell == 'Too Hot':
+                    GPIO.output(18,GPIO.HIGH)
+                else:
+                    GPIO.output(18,GPIO.LOW)
+                if light_cell == 'Too Dark':
+                    GPIO.output(23,GPIO.HIGH)
+                else:
+                    GPIO.output(23,GPIO.LOW)
+                
+                
+                time.sleep(0.6)
+                
+                
+                
+                
+                if i == 5:
+                    sheet.update_cell(1, 6, str(max(sheet.get_values("C2:C4"))[0]))
+                    sheet.update_cell(1, 8, str(min(sheet.get_values("D2:D4"))[0]))
+                    sheet.delete_rows(20,25)
+                    i = 0
+                i += 1
+                #pprint("New row: " + sheet.row_values(2))
+
+# data = {"date": str(datetime.datetime.now()), "movement": psutil.disk_usage("/").percent, "temperature": psutil.cpu_percent(1),
+#         "brightness": psutil.cpu_percent(1)}
+# 
+# print("data", data)
+
+# email = dochia21@student.oulu.fi
+# Password = Unioulu2021.
+# https://hook.integromat.com/g1q4jupqs219uekvkcgrdf30j652ss28
